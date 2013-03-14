@@ -6,7 +6,7 @@ from copy import deepcopy
 from fractions import Fraction
 from nose.tools import assert_raises, assert_almost_equal
 
-from infertweet.classify import MultinomialNB, evaluate
+from infer.classify import MultinomialNB, evaluate
 
 
 class TestMultinomialNB(object):

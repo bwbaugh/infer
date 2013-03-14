@@ -4,11 +4,10 @@ from setuptools import setup, find_packages
 from setuptools.command.install import install
 
 
-PROGRAM_NAME = 'infertweet'
+PROGRAM_NAME = 'infer'
 VERSION = '0.1.0'
-DESCRIPTION = ('Infer information from Tweets. Useful for human-centered '
-               'computing tasks, such as sentiment analysis, location '
-               'prediction, authorship profiling and more!')
+DESCRIPTION = ('Machine learning toolkit for classification and '
+               'assisting experimentation.')
 with open('requirements.txt') as f:
     REQUIREMENTS = f.read()
 with open('README.md') as f:
@@ -46,11 +45,12 @@ setup(
     long_description=LONG_DESCRIPTION,
     license='Creative Commons Attribution-NonCommercial-ShareAlike 3.0 '
             'Unported License',
-    classifiers=["Intended Audience :: Developers",
+    classifiers=["Development Status :: 2 - Pre-Alpha",
+                 "Intended Audience :: Developers",
+                 "Intended Audience :: Education",
                  "Intended Audience :: Science/Research",
                  "Natural Language :: English",
                  "Programming Language :: Python",
-                 "Programming Language :: Python :: 2.6",
                  "Programming Language :: Python :: 2.7",
                  "Programming Language :: Python :: Implementation :: PyPy",
                  "Topic :: Scientific/Engineering :: Artificial Intelligence",

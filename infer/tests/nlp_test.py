@@ -1,8 +1,8 @@
 # Copyright (C) 2013 Wesley Baugh
 from nose.tools import assert_raises
 
-from infertweet.nlp import FeatureExtractor
-from infertweet.classify import MultinomialNB
+from infer.nlp import FeatureExtractor
+from infer.classify import MultinomialNB
 
 
 class TestFeatureExtractor(object):
