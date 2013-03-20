@@ -10,6 +10,88 @@ from fractions import Fraction
 import nltk
 
 
+class MostCommon(object):
+    """Keep track the top-k key-value pairs.
+
+    Attributes:
+        top: Integer representing the top-k items to keep track of.
+        store: Dictionary of the top-k items.
+        min: The current minimum of any top-k item.
+        min_set: Set where keys are counts, and values are the set of
+            keys with that count.
+    """
+    def __init__(self, top):
+        """Create a new MostCommon object to track key-value paris.
+
+        Args:
+            top: Integer representing the top-k values to keep track of.
+        """
+        self.top = top
+        self.store = dict()
+        self.min = None
+        self.min_set = defaultdict(set)
+
+    def _update_existing(self, key, value):
+        """Update an item that is already one of the top-k values."""
+        # Currently handle values that are non-decreasing.
+        assert value > self.store[key]
+        self.min_set[self.store[key]].remove(key)
+        if self.store[key] == self.min:  # Previously was the minimum.
+            if not self.min_set[self.store[key]]:  # No more minimums.
+                del self.min_set[self.store[key]]
+                self.min_set[value].add(key)
+                self.min = min(self.min_set.keys())
+        self.min_set[value].add(key)
+        self.store[key] = value
+
+    def __contains__(self, key):
+        """Boolean if the key is one of the top-k items."""
+        return key in self.store
+
+    def __setitem__(self, key, value):
+        """Assign a value to a key.
+
+        The item won't be stored if it is less than the minimum (and
+        the store is already full). If the item is already in the store,
+        the value will be updated along with the `min` if necessary.
+        """
+        # Store it if we aren't full yet.
+        if len(self.store) < self.top:
+            if key in self.store:  # We already have this item.
+                self._update_existing(key, value)
+            else:  # Brand new item.
+                self.store[key] = value
+                self.min_set[value].add(key)
+                if value < self.min or self.min is None:
+                    self.min = value
+        else:  # We're full. The value must be greater minimum to be added.
+            if value > self.min:  # New item must be larger than current min.
+                if key in self.store:  # We already have this item.
+                    self._update_existing(key, value)
+                else:  # Brand new item.
+                    # Make room by removing one of the current minimums.
+                    old = self.min_set[self.min].pop()
+                    del self.store[old]
+                    # Delete the set if there are no old minimums left.
+                    if not self.min_set[self.min]:
+                        del self.min_set[self.min]
+                    # Add the new item.
+                    self.min_set[value].add(key)
+                    self.store[key] = value
+                    self.min = min(self.min_set.keys())
+
+    def __repr__(self):
+        if len(self.store) < 10:
+            store = repr(self.store)
+        else:
+            length = len(self.store)
+            largest = max(self.store.itervalues())
+            store = '<len={length}, max={largest}>'.format(length=length,
+                                                           largest=largest)
+        return ('{self.__class__.__name__}(top={self.top}, min={self.min}, '
+                'store={store})'.format(self=self, store=store))
+
+
 class Classifier(object):
     """Abstract base class for classifiers."""
     __metaclass__ = abc.ABCMeta
@@ -20,10 +102,19 @@ class MultinomialNB(Classifier):
     """Multinomial Naive Bayes for text classification.
 
     Attributes:
-        laplace: Smoothing parameter >= 0. (default 1)
         exact: Boolean indicating if exact probabilities should be
             returned as a `Fraction`. Otherwise, speed up computations
             but only return probabilities as a `float`. (default False)
+        laplace: Smoothing parameter >= 0. (default 1)
+        top_features: Number indicating the top-k most common features
+            to use during classification, sorted by the frequency the
+            feature has been seen (a count is kept for each label). This
+            is a form of feature selection because any feature that has
+            a frequency less than any of the top-k most common features
+            is ignored during classification. This value must be set
+            before any training of the classifier. (default None)
+
+    Properties:
         labels: Set of all class labels.
         vocabulary: Set of vocabulary across all class labels.
     """
@@ -32,8 +123,9 @@ class MultinomialNB(Classifier):
         Args:
             documents: Optional list of document-label pairs for training.
         """
-        self.laplace = 1
         self.exact = False
+        self.laplace = 1
+        self.top_features = None
         # Dictionary of sets of vocabulary by label.
         self._label_vocab = defaultdict(set)
         # Dictionary of times a label has been seen.
@@ -82,6 +174,12 @@ class MultinomialNB(Classifier):
                 self._label_vocab[label].add(feature)
                 self._label_feature_count[label][feature] += 1
                 self._label_length[label] += 1
+                if self.top_features:
+                    if not hasattr(self, '_most_common'):
+                        x = lambda: MostCommon(self.top_features)
+                        self._most_common = defaultdict(x)
+                    y = self._label_feature_count[label][feature]
+                    self._most_common[label][feature] = y
 
     def prior(self, label):
         """Prior probability of a label.
@@ -155,6 +253,10 @@ class MultinomialNB(Classifier):
             score = math.log(self.prior(label))
 
         for feature in document:
+            # Feature selection by only considering the top-k
+            # most common features (a form of dictionary trimming).
+            if self.top_features and feature not in self._most_common[label]:
+                continue
             conditional = self.conditional(feature, label)
             if self.exact:
                 score *= conditional

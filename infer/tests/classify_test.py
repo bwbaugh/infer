@@ -6,7 +6,112 @@ from copy import deepcopy
 from fractions import Fraction
 from nose.tools import assert_raises, assert_almost_equal
 
-from infer.classify import MultinomialNB, evaluate
+from infer.classify import MostCommon, MultinomialNB, evaluate
+
+
+class TestMostCommon(object):
+    def setup(self):
+        self.common = MostCommon(2)
+
+    def test_empty(self):
+        assert self.common.min is None
+        assert self.common.store == {}
+
+    def test_insert_grow(self):
+        assert 'a' not in self.common
+        self.common['a'] = 1
+        assert 'a' in self.common
+        assert self.common.min == 1
+
+    def test_modify_grow(self):
+        self.common['a'] = 1
+        self.common['a'] = 2
+        assert 'a' in self.common
+        assert self.common.min == 2
+        assert self.common.store == {'a': 2}
+
+    def test_insert_fill(self):
+        self.common['a'] = 1
+        self.common['b'] = 2
+        assert 'a' in self.common
+        assert 'b' in self.common
+
+    def test_modify_full(self):
+        self.common['a'] = 1
+        self.common['b'] = 2
+
+        self.common['a'] = 2
+        assert self.common.min == 2
+        self.common['a'] = 3
+        assert self.common.min == 2
+        self.common['b'] = 5
+        assert self.common.min == 3
+        self.common['b'] = 6
+        assert self.common.store == {'a': 3, 'b': 6}
+
+    def test_insert_full(self):
+        self.common['a'] = 1
+        self.common['b'] = 2
+        self.common['c'] = 3
+        assert 'a' not in self.common
+        assert self.common.min == 2
+        assert 'b' in self.common and 'c' in self.common
+
+        self.common['d'] = 4
+        assert 'd' in self.common
+        assert 'b' not in self.common
+        assert self.common.min == 3
+
+        self.common['c'] = 4
+        assert self.common.min == 4
+        self.common['e'] = 5
+        assert bool('c' in self.common) ^ bool('d' in self.common)
+
+    def test_insert_full_low(self):
+        self.common['b'] = 2
+        self.common['c'] = 3
+        assert 'a' not in self.common
+        self.common['a'] = 1
+        assert 'a' not in self.common
+        assert 'b' in self.common and 'c' in self.common
+        assert self.common.min == 2
+
+    def test_insert_grow_low(self):
+        self.common['b'] = 2
+        assert self.common.min == 2
+        self.common['a'] = 1
+        assert self.common.min == 1
+
+    def test_insert_nondecreasing(self):
+        self.common['a'] = 2
+        try:
+            self.common['a'] = 1
+        except AssertionError:
+            pass
+        else:
+            raise AssertionError
+
+    def test_repr(self):
+        result = repr(self.common)
+        assert result == "MostCommon(top=2, min=None, store={})"
+
+        self.common['a'] = 1
+        result = repr(self.common)
+        assert result == "MostCommon(top=2, min=1, store={'a': 1})"
+
+        self.common['b'] = 2
+        self.common['c'] = 3
+        result = repr(self.common)
+        option1 = "MostCommon(top=2, min=2, store={'b': 2, 'c': 3})"
+        option2 = "MostCommon(top=2, min=2, store={'c': 3, 'b': 2})"
+        assert result == option1 or result == option2
+
+        self.common = MostCommon(20)
+        for x in range(ord('a'), ord('z') + 1):
+            self.common[chr(x)] = x
+        result = repr(self.common)
+        expected = "MostCommon(top=20, min=103, store=<len=20, max=122>)"
+        assert result == expected
 
 
 class TestMultinomialNB(object):
@@ -225,6 +330,28 @@ class TestMultinomialNB(object):
     def test_classify_not_tokenized(self):
         document = 'Chinese Chinese Chinese Tokyo Japan'
         assert_raises(TypeError, self.classifier.classify, document)
+
+    def test_top_features(self):
+        docs = [(['happy', 'joy', 'smile'], 'positive'),
+                (['happy', 'joy', 'frown'], 'positive'),
+                (['sad', 'frown', 'tired'], 'negative'),
+                (['sad', 'tired', 'bored'], 'negative')]
+        classifier = MultinomialNB()
+        classifier.top_features = 2
+        classifier.train(*docs)
+
+        result = classifier._most_common['positive'].store
+        assert result == {'happy': 2, 'joy': 2}
+        result = classifier._most_common['negative'].store
+        assert result == {'sad': 2, 'tired': 2}
+
+        first = classifier.prob_all(['happy', 'smile'])
+        second = classifier.prob_all(['happy', 'smile', 'smile'])
+        assert first == second, classifier._most_common
+
+        first = classifier.prob_all(['sad', 'tired'])['negative']
+        second = classifier.prob_all(['sad', 'tired', 'frown'])['negative']
+        assert first == second, classifier._most_common
 
 
 class TestEvaluate(object):
