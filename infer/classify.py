@@ -4,7 +4,7 @@ from __future__ import division
 
 import abc
 import math
-from collections import defaultdict, namedtuple
+from collections import defaultdict, namedtuple, Counter
 from fractions import Fraction
 
 import nltk
@@ -37,11 +37,11 @@ class MultinomialNB(Classifier):
         # Dictionary of sets of vocabulary by label.
         self._label_vocab = defaultdict(set)
         # Dictionary of times a label has been seen.
-        self._label_count = defaultdict(int)
+        self._label_count = Counter()
         # Dictionary of number of feature seen in all documents by label.
-        self._label_length = defaultdict(int)
+        self._label_length = Counter()
         # Dictionary of times a feature has been seen by label.
-        self._label_feature_count = defaultdict(lambda: defaultdict(int))
+        self._label_feature_count = defaultdict(Counter)
         # Size of vocabulary across all class labels.
         self._vocab_size = 0
         if documents:
@@ -96,7 +96,7 @@ class MultinomialNB(Classifier):
         """
         if label not in self.labels:
             raise KeyError(label)
-        total = sum(self._label_count[x] for x in self._label_count)
+        total = sum(self._label_count.values())
         if self.exact:
             return Fraction(self._label_count[label], total)
         else:
