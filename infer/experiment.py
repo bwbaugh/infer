@@ -3,7 +3,7 @@
 import abc
 from collections import namedtuple
 
-from infertweet import classify
+from infer import classify
 
 
 class Experiment(object):
