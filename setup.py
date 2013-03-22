@@ -5,7 +5,7 @@ from setuptools.command.install import install
 
 
 PROGRAM_NAME = 'infer'
-VERSION = '0.1'
+VERSION = '0.2'
 DESCRIPTION = ('A machine learning toolkit for classification and '
                'assisted experimentation.')
 with open('requirements.txt') as f:
